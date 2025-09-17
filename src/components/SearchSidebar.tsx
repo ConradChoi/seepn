@@ -4,7 +4,7 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 interface SearchSidebarProps {
   searchKeyword: string;
   setSearchKeyword: (value: string) => void;
-  currentLanguage: "ko" | "en" | "ja" | "zh";
+  currentLanguage?: "ko" | "en" | "ja" | "zh";
   getText: (key: string) => string;
   getL1Categories: (lang: string) => { value: string; label: string }[];
   getL2Categories: (
@@ -19,7 +19,7 @@ interface SearchSidebarProps {
 }
 
 export const SearchSidebar: React.FC<SearchSidebarProps> = ({
-  currentLanguage,
+  currentLanguage = 'ko',
   searchKeyword,
   setSearchKeyword,
   getL1Categories,
@@ -37,7 +37,7 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
       console.error("Error loading L1 categories:", error);
       return [];
     }
-  }, [currentLanguage]);
+  }, [currentLanguage, getL1Categories]);
 
   // L2 카테고리
   const l2Categories = useMemo(() => {
@@ -49,7 +49,7 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
       console.error("Error loading L2 categories:", error);
       return [];
     }
-  }, [selectedL1Category, currentLanguage]);
+  }, [selectedL1Category, currentLanguage, getL2Categories]);
 
   // L3 카테고리
   const l3Categories = useMemo(() => {
@@ -67,7 +67,7 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
       console.error("Error loading L3 categories:", error);
       return [];
     }
-  }, [selectedL1Category, selectedL2Category, currentLanguage]);
+  }, [selectedL1Category, selectedL2Category, currentLanguage, getL3Categories]);
   const handleL1CategoryChange = (value: string) => {
     try {
       setSelectedL1Category(value || "");
