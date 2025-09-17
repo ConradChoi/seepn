@@ -15,19 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SEEPN : 공급사 검색 서비스",
   description: "다양한 산업 분야의 신뢰할 수 있는 공급사들을 검색하고 비교해보세요.",
-  keywords: [
-    "공급사 검색 서비스",
-    "공급사 검색 플랫폼",
-    "시픈",
-    "seepn",
-    "서플라이",
-    "서플라이어",
-    "써플라이",
-    "써플라이어",
-    "supply",
-    "supplier",
-    "suppliers",
-  ],
 };
 
 export default function RootLayout({
