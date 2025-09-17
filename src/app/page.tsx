@@ -6,6 +6,8 @@ import { Search, Menu, User, Globe, X, Play, Pause, ChevronLeft, ChevronRight, C
 import { useRouter } from 'next/navigation';
 import { getL1Categories } from '../utils/categories';
 import { getL1Areas } from '../utils/areas';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
 export default function Home() {
   const router = useRouter();
@@ -392,88 +394,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Top Banner */}
-      {isBannerVisible && (
-        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white z-50 flex items-center" style={{ height: '48px' }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center justify-center flex-1">
-                <span className="text-sm font-medium">🎉 새로운 공급사 등록 이벤트 진행 중! 지금 바로 확인해보세요</span>
-              </div>
-              <button
-                onClick={() => setIsBannerVisible(false)}
-                className="p-1 hover:bg-blue-700 rounded transition-colors flex items-center justify-center"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white shadow-sm border-b border-gray-100 z-40" style={{ top: isBannerVisible ? '48px' : '0px' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href='/' className="flex items-center hover:opacity-80 transition-opacity">
-                <h1 className="text-2xl font-bold text-gray-900">SEEPN</h1>
-                <span className="hidden md:block ml-2 text-sm text-gray-500">{getText('serviceName')}</span>
-              </Link>
-            </div>
-            
-            {/* Menu, User, and Language Icons */}
-            <div className="flex items-center space-x-4">
-              {/* Menu Icon */}
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-              
-              {/* User Icon */}
-              <button 
-                onClick={() => setIsMyPageOpen(!isMyPageOpen)}
-                className="p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <User className="h-6 w-6" />
-              </button>
-              
-              {/* Language Selector */}
-              <div className="relative language-dropdown">
-                <button
-                  onClick={() => setIsLanguageOpen(!isLanguageOpen)}
-                  className="p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Globe className="h-6 w-6" />
-                </button>
-                
-                {/* Language Dropdown */}
-                {isLanguageOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    {languages.map((language) => (
-                      <button
-                        key={language.code}
-                        onClick={() => handleLanguageChange(language.code)}
-                        className={`w-full flex items-center px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
-                          currentLanguage === language.code ? 'text-blue-600 font-medium' : 'text-gray-700'
-                        }`}
-                      >
-                        <span className="mr-3 text-lg">{language.flag}</span>
-                        {language.name}
-                        {currentLanguage === language.code && (
-                          <span className="ml-auto text-blue-600">✓</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Shared Header */}
+      <Header
+        isBannerVisible={isBannerVisible}
+        setIsBannerVisible={setIsBannerVisible}
+        currentLanguage={currentLanguage}
+        setCurrentLanguage={setCurrentLanguage}
+        isLoggedIn={isLoggedIn}
+        setIsLoggedIn={setIsLoggedIn}
+      />
 
       {/* Side Menu Overlay */}
       {(isMenuOpen || isMyPageOpen) && (
@@ -991,29 +920,8 @@ export default function Home() {
         </>
       )}
 
-      {/* Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <div className="flex flex-wrap justify-center items-center gap-4 text-sm text-gray-600 mb-4">
-              <span>{getText('accessCountry')}: {userCountry}</span>
-              <span className="text-gray-400">|</span>
-              <a href="https://www.ylia.io" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900">{getText('ylia')}</a>
-              <span className="text-gray-400">|</span>
-              <Link href="/terms" className="hover:text-gray-900">{getText('termsOfService')}</Link>
-              <span className="text-gray-400">|</span>
-              <Link href="/privacy" className="hover:text-gray-900 font-bold">{getText('privacyPolicy')}</Link>
-              <span className="text-gray-400">|</span>
-              <Link href="/contact" className="hover:text-gray-900">{getText('partnershipInquiry')}</Link>
-              <span className="text-gray-400">|</span>
-              <a href="https://www.suppliers.kr" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900">{getText('supplier')}</a>
-            </div>
-            <p className="text-sm text-gray-600">
-              {getText('copyright')}
-            </p>
-          </div>
-        </div>
-      </footer>
+      {/* Shared Footer */}
+      <Footer currentLanguage={currentLanguage} userCountry={userCountry} />
     </div>
   );
 }
