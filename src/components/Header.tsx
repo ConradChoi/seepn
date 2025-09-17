@@ -3,6 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { Menu, User, Globe, X, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface HeaderProps {
   isBannerVisible: boolean;
@@ -26,6 +29,10 @@ export default function Header({
   const [isMyPageOpen, setIsMyPageOpen] = React.useState(false);
   const [currentBannerIndex, setCurrentBannerIndex] = React.useState(0);
   const [isBannerPaused, setIsBannerPaused] = React.useState(false);
+  const [userEmail, setUserEmail] = React.useState<string>('');
+  const [userDisplayName, setUserDisplayName] = React.useState<string>('');
+  const [userNickname, setUserNickname] = React.useState<string>('');
+  const [userPhotoURL, setUserPhotoURL] = React.useState<string | null>(null);
 
   const languages = [
     { code: 'ko', name: '한국어', flag: '🇰🇷' },
@@ -63,6 +70,33 @@ export default function Header({
       return () => clearInterval(interval);
     }
   }, [isBannerPaused, isMenuOpen, banners.length]);
+
+  // Auth state sync
+  React.useEffect(() => {
+    const auth = getAuth(firebaseApp);
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        setUserEmail(user.email || '');
+        setUserDisplayName(user.displayName || '');
+        setUserPhotoURL(user.photoURL || null);
+        try {
+          const snap = await getDoc(doc(firestoreClient, 'users', user.uid));
+          const data = snap.exists() ? snap.data() as any : null;
+          setUserNickname(data?.nickname || '');
+        } catch {
+          setUserNickname('');
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserEmail('');
+        setUserDisplayName('');
+        setUserNickname('');
+        setUserPhotoURL(null);
+      }
+    });
+    return () => unsub();
+  }, [setIsLoggedIn]);
 
   // Language-specific text content
   const getText = (key: string) => {
@@ -419,12 +453,17 @@ export default function Header({
           <div className="p-6 border-b border-gray-200">
             {isLoggedIn ? (
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <User className="h-6 w-6 text-blue-600" />
+                <div className="w-12 h-12 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center">
+                  {userPhotoURL ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={userPhotoURL} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-6 w-6 text-blue-600" />
+                  )}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">홍길동님</p>
-                  <p className="text-sm text-gray-500">user@example.com</p>
+                  <p className="font-medium text-gray-900">{userNickname || userDisplayName || '사용자'}</p>
+                  <p className="text-sm text-gray-500">{userEmail}</p>
                 </div>
               </div>
             ) : (
@@ -432,7 +471,7 @@ export default function Header({
                 <User className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600 mb-3">{getText('loginPrompt')}</p>
                 <button 
-                  onClick={() => setIsLoggedIn(true)} // 임시 로그인 기능
+                  onClick={() => { setIsMyPageOpen(false); window.location.href = '/login'; }}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   {getText('login')}
@@ -517,9 +556,13 @@ export default function Header({
               {isLoggedIn && (
                 <li className="pt-4 border-t border-gray-200">
                   <button 
-                    onClick={() => {
-                      setIsLoggedIn(false);
-                      setIsMyPageOpen(false);
+                    onClick={async () => {
+                      try {
+                        await signOut(getAuth(firebaseApp));
+                      } finally {
+                        setIsLoggedIn(false);
+                        setIsMyPageOpen(false);
+                      }
                     }}
                     className="flex items-center p-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors w-full text-left"
                   >
