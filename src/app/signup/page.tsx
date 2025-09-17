@@ -220,10 +220,19 @@ export default function SignupPage() {
       if (fullName.trim()) {
         await updateProfile(credential.user, { displayName: fullName.trim() });
       }
+      const generateNickname = (seedName: string, seedEmail: string) => {
+        const base = (seedName?.trim() || seedEmail.split('@')[0] || 'user')
+          .replace(/\s+/g, '')
+          .slice(0, 16);
+        const rand = Math.random().toString(36).slice(2, 8);
+        return `${base}-${rand}`.toLowerCase();
+      };
+      const nickname = generateNickname(fullName, email);
       await setDoc(doc(firestoreClient, 'users', credential.user.uid), {
         email: email.trim(),
         fullName: fullName.trim(),
         phone: phone.trim(),
+        nickname,
         agreements: {
           tos: agreeTos,
           privacy: agreePrivacy,
