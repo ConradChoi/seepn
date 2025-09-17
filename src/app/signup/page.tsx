@@ -5,6 +5,9 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SignupPage() {
   const [isBannerVisible, setIsBannerVisible] = React.useState(true);
@@ -211,12 +214,45 @@ export default function SignupPage() {
       return;
     }
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setIsSubmitting(false);
-    setMessage(getText('success'));
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 700);
+    try {
+      const auth = getAuth(firebaseApp);
+      const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (fullName.trim()) {
+        await updateProfile(credential.user, { displayName: fullName.trim() });
+      }
+      await setDoc(doc(firestoreClient, 'users', credential.user.uid), {
+        email: email.trim(),
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        agreements: {
+          tos: agreeTos,
+          privacy: agreePrivacy,
+          marketingEmail: agreeMarketingEmail,
+          marketingSms: agreeMarketingSms,
+        },
+        createdAt: serverTimestamp(),
+        language: currentLanguage,
+        country: userCountry,
+      }, { merge: true });
+
+      setMessage(getText('success'));
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 700);
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/email-already-in-use') {
+        setError('이미 가입된 이메일입니다.');
+      } else if (code === 'auth/invalid-email') {
+        setError(getText('invalidEmail'));
+      } else if (code === 'auth/weak-password') {
+        setError(getText('validationPolicy'));
+      } else {
+        setError(err?.message || '가입 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
