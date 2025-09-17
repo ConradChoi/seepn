@@ -649,7 +649,6 @@ function SuppliersContent() {
           <SearchSidebar
             searchKeyword={searchKeyword}
             setSearchKeyword={setSearchKeyword}
-            currentLanguage={currentLanguage as any}
             getText={getText}
             getL1Categories={getL1Categories}
             getL2Categories={getL2Categories}
