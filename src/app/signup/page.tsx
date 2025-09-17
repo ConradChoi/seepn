@@ -221,11 +221,19 @@ export default function SignupPage() {
         await updateProfile(credential.user, { displayName: fullName.trim() });
       }
       const generateNickname = (seedName: string, seedEmail: string) => {
-        const base = (seedName?.trim() || seedEmail.split('@')[0] || 'user')
-          .replace(/\s+/g, '')
-          .slice(0, 16);
-        const rand = Math.random().toString(36).slice(2, 8);
-        return `${base}-${rand}`.toLowerCase();
+        // Rules (same as profile):
+        // - Max 10 chars
+        // - Allowed: Korean/English letters and numbers
+        // - Must start with Korean/English letter
+        const normalize = (s: string) => s.replace(/[^a-zA-Z0-9가-힣]/g, '');
+        let base = normalize(seedName?.trim() || seedEmail.split('@')[0] || 'user');
+        if (!/^[a-zA-Z가-힣]/.test(base)) base = `u${base}`; // ensure valid start
+        if (base.length > 10) base = base.slice(0, 10);
+        if (base.length < 4) {
+          const rand = Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 10 - base.length);
+          base = (base + rand).slice(0, 10);
+        }
+        return base;
       };
       const nickname = generateNickname(fullName, email);
       await setDoc(doc(firestoreClient, 'users', credential.user.uid), {
