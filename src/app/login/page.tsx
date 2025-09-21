@@ -6,6 +6,8 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Eye, EyeOff } from 'lucide-react';
 import { LoginTexts } from '../types';
+import { firebaseApp } from '@/lib/firebase/client';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const [isBannerVisible, setIsBannerVisible] = React.useState(true);
@@ -98,14 +100,19 @@ export default function LoginPage() {
     }
     setIsSubmitting(true);
     try {
-      // mock API delay
-      await new Promise((r) => setTimeout(r, 800));
+      const auth = getAuth(firebaseApp);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       setIsLoggedIn(true);
-      // redirect after login (mock)
       window.location.href = '/';
-    } catch (err) {
-      console.error('Login failed', err);
-      setError('로그인에 실패했습니다. 다시 시도해주세요.');
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found') {
+        setError('회원가입 후 진행해주세요.');
+      } else if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-email') {
+        setError('정보가 다릅니다. 확인 후 다시 시도해주세요.');
+      } else {
+        setError('로그인에 실패했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setIsSubmitting(false);
     }
