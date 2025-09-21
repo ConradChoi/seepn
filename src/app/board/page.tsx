@@ -386,6 +386,10 @@ export default function BoardPage() {
 
   // Handle write button
   const handleWrite = () => {
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
     router.push('/board/write');
   };
 

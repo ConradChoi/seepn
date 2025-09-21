@@ -41,6 +41,13 @@ export default function BoardWritePage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Guard: redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.replace('/login');
+    }
+  }, [isLoggedIn, router]);
+
   // Fetch user country
   useEffect(() => {
     const fetchUserCountry = async () => {
