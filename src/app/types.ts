@@ -57,5 +57,8 @@ export interface LoginTexts {
   required?: string;
   proceed?: string;
   enterEmail?: string;
+  expired?: string;
+  resend?: string;
+  timeLeft?: string;
 }
 
