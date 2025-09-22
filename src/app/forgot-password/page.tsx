@@ -8,6 +8,7 @@ import { LoginTexts } from '../types';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const RECIPIENT_EMAIL = 'jhc@ylia.io';
   const [isBannerVisible, setIsBannerVisible] = React.useState(true);
   const [currentLanguage, setCurrentLanguage] = React.useState<'ko' | 'en' | 'ja' | 'zh'>('ko');
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
@@ -145,7 +146,7 @@ export default function ForgotPasswordPage() {
     const expireAt = Date.now() + 5 * 60 * 1000; // 5 minutes
     setExpiresAt(expireAt);
     startTimer(expireAt);
-    setMessage(getText('sent') ?? '');
+    setMessage(`${getText('sent') ?? ''} (${RECIPIENT_EMAIL})`);
     setIsSending(false);
   };
 
