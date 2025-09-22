@@ -19,6 +19,9 @@ export default function ForgotPasswordPage() {
   const [isSending, setIsSending] = React.useState(false);
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [message, setMessage] = React.useState('');
+  const [expiresAt, setExpiresAt] = React.useState<number | null>(null);
+  const [remainingSec, setRemainingSec] = React.useState(0);
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
     const getUserCountry = async () => {
@@ -47,8 +50,11 @@ export default function ForgotPasswordPage() {
         sent: '인증번호를 이메일로 전송했습니다.',
         invalidEmail: '올바른 이메일을 입력하세요.',
         enterCode: '전송된 인증번호 6자리를 입력하세요.',
-        incorrectCode: '인증번호가 올바르지 않습니다.',
+        incorrectCode: '입력한 인증번호가 다릅니다.',
         proceed: '검증이 완료되었습니다. 비밀번호 재설정 화면으로 이동합니다.',
+        expired: '입력시간이 초과하였습니다. 인증번호 재발급 후 진행해주세요.',
+        resend: '인증번호 재발급',
+        timeLeft: '남은 시간',
       },
       en: {
         pageTitle: 'Find Password',
@@ -61,7 +67,10 @@ export default function ForgotPasswordPage() {
         invalidEmail: 'Please enter a valid email.',
         enterCode: 'Enter the 6-digit code you received.',
         incorrectCode: 'Incorrect verification code.',
-        proceed: 'Verification completed. Redirecting to reset page.'
+        proceed: 'Verification completed. Redirecting to reset page.',
+        expired: 'The code has expired. Please request a new code.',
+        resend: 'Resend Code',
+        timeLeft: 'Time left',
       },
       ja: {
         pageTitle: 'パスワードを探す',
@@ -74,7 +83,10 @@ export default function ForgotPasswordPage() {
         invalidEmail: '有効なメールアドレスを入力してください。',
         enterCode: '受信した6桁のコードを入力してください。',
         incorrectCode: '認証コードが正しくありません。',
-        proceed: '検証が完了しました。リセットページに移動します。'
+        proceed: '検証が完了しました。リセットページに移動します。',
+        expired: 'コードの有効期限が切れました。再発行してください。',
+        resend: 'コードを再送',
+        timeLeft: '残り時間',
       },
       zh: {
         pageTitle: '找回密码',
@@ -87,7 +99,10 @@ export default function ForgotPasswordPage() {
         invalidEmail: '请输入有效的邮箱地址。',
         enterCode: '请输入收到的6位验证码。',
         incorrectCode: '验证码不正确。',
-        proceed: '验证完成。正在跳转到重置页面。'
+        proceed: '验证完成。正在跳转到重置页面。',
+        expired: '验证码已过期，请重新获取。',
+        resend: '重新发送验证码',
+        timeLeft: '剩余时间',
       }
     } as const;
     return texts[currentLanguage]?.[key] ?? texts.ko[key];
@@ -95,6 +110,26 @@ export default function ForgotPasswordPage() {
   };
 
   const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current as unknown as number);
+      timerRef.current = null;
+    }
+  };
+
+  const startTimer = (expireEpochMs: number) => {
+    clearTimer();
+    const update = () => {
+      const sec = Math.max(0, Math.floor((expireEpochMs - Date.now()) / 1000));
+      setRemainingSec(sec);
+      if (sec === 0) {
+        clearTimer();
+      }
+    };
+    update();
+    timerRef.current = setInterval(update, 1000);
+  };
 
   const handleSendCode = async () => {
     setMessage('');
@@ -107,6 +142,9 @@ export default function ForgotPasswordPage() {
     // Mock 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setSentCode(code ?? '');
+    const expireAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+    setExpiresAt(expireAt);
+    startTimer(expireAt);
     setMessage(getText('sent') ?? '');
     setIsSending(false);
   };
@@ -117,6 +155,10 @@ export default function ForgotPasswordPage() {
       setMessage(getText('enterCode') ?? '');
       return;
     }
+    if (!expiresAt || Date.now() > expiresAt) {
+      setMessage(getText('expired') ?? '');
+      return;
+    }
     setIsVerifying(true);
     await new Promise((r) => setTimeout(r, 500));
     if (inputCode !== sentCode) {
@@ -125,10 +167,17 @@ export default function ForgotPasswordPage() {
       return;
     }
     setMessage(getText('proceed') ?? '');
+    clearTimer();
     setTimeout(() => {
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
     }, 700);
   };
+
+  React.useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -180,7 +229,7 @@ export default function ForgotPasswordPage() {
                 placeholder="000000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent tracking-widest"
               />
-              <div className="mt-2">
+              <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleVerify}
@@ -189,6 +238,19 @@ export default function ForgotPasswordPage() {
                 >
                   {isVerifying ? getText('verifying') : getText('verify')}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={isSending || !validateEmail(email)}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  {getText('resend')}
+                </button>
+                {expiresAt && (
+                  <span className="ml-auto text-sm text-gray-600">
+                    {getText('timeLeft')}: {String(Math.floor(remainingSec / 60)).padStart(2, '0')}:{String(remainingSec % 60).padStart(2, '0')}
+                  </span>
+                )}
               </div>
             </div>
 
