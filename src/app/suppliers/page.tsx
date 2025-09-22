@@ -1,14 +1,17 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { getL1Categories, getL2Categories, getL3Categories } from '../../utils/categories';
 import { getL1Areas, getL2Areas } from '../../utils/areas';
 import { Grid3X3, List, MapPin, Star, Filter, X, Heart, ExternalLink, ThumbsUp, ChevronDown, ChevronLeft } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
+import { firebaseApp } from '@/lib/firebase/client';
 
 function SuppliersContent() {
+  const router = useRouter();
   const [isBannerVisible, setIsBannerVisible] = React.useState(true);
   const [currentLanguage, setCurrentLanguage] = React.useState('ko');
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
@@ -318,6 +321,18 @@ function SuppliersContent() {
   // Mock counters for likes and favorites
   const getLikesCount = (supplier: { id: number }) => (supplier.id % 100) + 10;
   const getFavoritesCount = (supplier: { id: number }) => (supplier.id % 50) + 5;
+
+  // Detail navigation with auth guard
+  const handleViewDetail = React.useCallback((supplierId: number) => {
+    const auth = getAuth(firebaseApp);
+    const user = auth.currentUser;
+    const target = `/suppliers/${supplierId}`;
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(target)}`);
+      return;
+    }
+    router.push(target);
+  }, [router]);
 
   // 카테고리 선택 핸들러
   const handleL1CategoryChange = (value: string) => {
@@ -833,7 +848,7 @@ function SuppliersContent() {
                                   </div>
                                 </div>
                               
-                              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
+                              <button onClick={() => handleViewDetail(supplier.id)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
                                 {getText('viewDetail')}
                               </button>
                             </div>
@@ -914,7 +929,7 @@ function SuppliersContent() {
                                  </div>
                                 
                                 <div className="flex justify-end">
-                                  <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
+                                  <button onClick={() => handleViewDetail(supplier.id)} className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
                                     {getText('viewDetail')}
                                   </button>
                                 </div>
