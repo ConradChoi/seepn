@@ -139,15 +139,43 @@ export default function ForgotPasswordPage() {
       return;
     }
     setIsSending(true);
-    await new Promise((r) => setTimeout(r, 600));
-    // Mock 6-digit code
+    await new Promise((r) => setTimeout(r, 200));
+    // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setSentCode(code ?? '');
     const expireAt = Date.now() + 5 * 60 * 1000; // 5 minutes
     setExpiresAt(expireAt);
     startTimer(expireAt);
-    setMessage(`${getText('sent') ?? ''} (${RECIPIENT_EMAIL})`);
-    setIsSending(false);
+
+    try {
+      // Send email via API route
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: RECIPIENT_EMAIL,
+          subject: '[SEEPn] 비밀번호 찾기 인증번호',
+          html: `
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111">
+              <p>요청하신 인증번호는 다음과 같습니다.</p>
+              <p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${code}</p>
+              <p>유효시간: 5분</p>
+              <hr/>
+              <p>입력하신 계정 이메일: ${email}</p>
+            </div>
+          `,
+        }),
+      });
+      if (!res.ok) {
+        setMessage('이메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      } else {
+        setMessage(`${getText('sent') ?? ''} (${RECIPIENT_EMAIL})`);
+      }
+    } catch (err) {
+      setMessage('이메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleVerify = async () => {
