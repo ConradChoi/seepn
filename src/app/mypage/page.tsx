@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Heart, Star, MessageSquare, ClipboardList, User as UserIcon, CalendarDays } from 'lucide-react';
+import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function MyPageDashboard() {
   const [currentLanguage, setCurrentLanguage] = useState('ko');
@@ -13,14 +16,12 @@ export default function MyPageDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const router = useRouter();
 
-  // Sample user info (placeholder)
+  // User info from Firebase
   const [visitCount, setVisitCount] = useState(1);
-  const user = useMemo(() => ({
-    nickname: '홍길동',
-    email: 'hong@example.com',
-    joinedAt: '2024-06-01', // ISO date
-    avatarText: '홍',
-  }), []);
+  const [userEmail, setUserEmail] = useState('');
+  const [userNickname, setUserNickname] = useState('');
+  const [userJoinedAt, setUserJoinedAt] = useState<string>('');
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
 
   // Sample activity data (placeholder)
   const [activity, setActivity] = useState({
@@ -55,6 +56,28 @@ export default function MyPageDashboard() {
     } catch (e) {
       setVisitCount((v) => v);
     }
+
+    // Auth + user profile
+    const auth = getAuth(firebaseApp);
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        setIsLoggedIn(false);
+        return;
+      }
+      setIsLoggedIn(true);
+      setUserEmail(u.email || '');
+      setUserPhotoURL(u.photoURL || null);
+      try {
+        const snap = await getDoc(doc(firestoreClient, 'users', u.uid));
+        const data = snap.exists() ? (snap.data() as any) : null;
+        setUserNickname(data?.nickname || u.displayName || '');
+        setUserJoinedAt(data?.createdAt || (u.metadata?.creationTime ? new Date(u.metadata.creationTime).toISOString() : ''));
+      } catch {
+        setUserNickname(u.displayName || '');
+        setUserJoinedAt(u.metadata?.creationTime ? new Date(u.metadata.creationTime).toISOString() : '');
+      }
+    });
+    return () => unsub();
   }, []);
 
   const getText = (key: string) => {
@@ -145,6 +168,8 @@ export default function MyPageDashboard() {
 
   const numberFormat = (n: number) => n.toLocaleString();
 
+  const avatarInitial = userNickname?.[0] || 'U';
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Header
@@ -165,17 +190,22 @@ export default function MyPageDashboard() {
             <div className="bg-white border border-gray-200 rounded-lg p-6 md:p-8 lg:col-span-1">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">{getText('userInfo')}</h2>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold">
-                  {user.avatarText}
+                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold overflow-hidden">
+                  {userPhotoURL ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={userPhotoURL} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{avatarInitial}</span>
+                  )}
                 </div>
                 <div>
                   <div className="text-gray-900 font-semibold text-lg flex items-center gap-2">
-                    <span>{user.nickname}</span>
-                    <span className="text-sm text-gray-500">{user.email}</span>
+                    <span>{userNickname || '사용자'}</span>
+                    <span className="text-sm text-gray-500">{userEmail}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                     <CalendarDays className="h-4 w-4" />
-                    <span>{getText('joinedAt')}: {formatDate(user.joinedAt)}</span>
+                    <span>{getText('joinedAt')}: {userJoinedAt ? formatDate(userJoinedAt) : '-'}</span>
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
                     {numberFormat(visitCount)}{getText('nthVisit')}
