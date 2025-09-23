@@ -6,7 +6,8 @@ import Footer from '@/components/Footer';
 import { Camera, X, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
-import { getAuth, onAuthStateChanged, updateEmail } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, updateEmail, updateProfile } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function MyPageProfileEdit() {
@@ -26,6 +27,8 @@ export default function MyPageProfileEdit() {
   const [phone, setPhone] = useState('010-1234-5678');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [initialAvatarUrl, setInitialAvatarUrl] = useState<string | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
 
   // Agreements
   const [agreeTerms, _] = useState(true);
@@ -55,6 +58,9 @@ export default function MyPageProfileEdit() {
         if (data.nickname) setNickname(String(data.nickname));
         if (data.fullName) setName(String(data.fullName));
         if (data.phone) setPhone(String(data.phone));
+        const loadedPhoto = data?.photoURL || user.photoURL || null;
+        setAvatarUrl(loadedPhoto);
+        setInitialAvatarUrl(loadedPhoto);
         const agreements = (data.agreements || {}) as any;
         if (typeof agreements.marketing === 'boolean') setAgreeMarketing(agreements.marketing);
         if (agreements.channels) {
@@ -224,12 +230,14 @@ export default function MyPageProfileEdit() {
     setAvatarFile(file);
     const url = URL.createObjectURL(file);
     setAvatarUrl(url);
+    setAvatarRemoved(false);
   };
 
   const handleAvatarRemove = () => {
     setAvatarFile(null);
     if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     setAvatarUrl(null);
+    setAvatarRemoved(true);
   };
 
   const handleCancel = () => {
@@ -260,6 +268,30 @@ export default function MyPageProfileEdit() {
         }
       }
 
+      // Handle avatar upload/remove
+      let newPhotoURL: string | null | undefined = undefined;
+      const storage = getStorage(firebaseApp);
+      if (avatarFile) {
+        const fileName = `${Date.now()}_${avatarFile.name}`.replace(/\s+/g, '_');
+        const storageRef = ref(storage, `avatars/${user.uid}/${fileName}`);
+        await uploadBytes(storageRef, avatarFile);
+        newPhotoURL = await getDownloadURL(storageRef);
+        try {
+          if (initialAvatarUrl && initialAvatarUrl !== newPhotoURL) {
+            await deleteObject(ref(storage, initialAvatarUrl));
+          }
+        } catch {}
+        await updateProfile(user, { photoURL: newPhotoURL });
+      } else if (avatarRemoved) {
+        newPhotoURL = '';
+        try {
+          if (initialAvatarUrl) {
+            await deleteObject(ref(storage, initialAvatarUrl));
+          }
+        } catch {}
+        await updateProfile(user, { photoURL: newPhotoURL });
+      }
+
       // Persist profile fields in Firestore
       const ref = doc(firestoreClient, 'users', user.uid);
       await setDoc(
@@ -269,6 +301,7 @@ export default function MyPageProfileEdit() {
           fullName: name,
           phone,
           nickname,
+          ...(newPhotoURL !== undefined ? { photoURL: newPhotoURL } : {}),
           agreements: {
             terms: true,
             privacy: true,
@@ -279,6 +312,9 @@ export default function MyPageProfileEdit() {
         },
         { merge: true }
       );
+      if (typeof newPhotoURL === 'string') {
+        setInitialAvatarUrl(newPhotoURL || null);
+      }
       setMessage('success');
     } catch (e) {
       setMessage('error');
