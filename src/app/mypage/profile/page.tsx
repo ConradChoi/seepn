@@ -5,6 +5,9 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Camera, X, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
+import { getAuth, onAuthStateChanged, updateEmail } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function MyPageProfileEdit() {
   const router = useRouter();
@@ -18,7 +21,7 @@ export default function MyPageProfileEdit() {
   // Sample user data (placeholder)
   const [email, setEmail] = useState('user@example.com');
   const [isEmailEditing, setIsEmailEditing] = useState(false);
-  const [name] = useState('홍길동');
+  const [name, setName] = useState('홍길동');
   const [nickname, setNickname] = useState('홍길동');
   const [phone, setPhone] = useState('010-1234-5678');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -33,6 +36,37 @@ export default function MyPageProfileEdit() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // Load current user profile
+  useEffect(() => {
+    const auth = getAuth(firebaseApp);
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setIsLoggedIn(false);
+        return;
+      }
+      setIsLoggedIn(true);
+      try {
+        setEmail(user.email || '');
+        setName(user.displayName || '');
+        const ref = doc(firestoreClient, 'users', user.uid);
+        const snap = await getDoc(ref);
+        const data = (snap.exists() ? (snap.data() as any) : {}) as any;
+        if (data.nickname) setNickname(String(data.nickname));
+        if (data.fullName) setName(String(data.fullName));
+        if (data.phone) setPhone(String(data.phone));
+        const agreements = (data.agreements || {}) as any;
+        if (typeof agreements.marketing === 'boolean') setAgreeMarketing(agreements.marketing);
+        if (agreements.channels) {
+          if (typeof agreements.channels.email === 'boolean') setMarketingEmail(agreements.channels.email);
+          if (typeof agreements.channels.sms === 'boolean') setMarketingSMS(agreements.channels.sms);
+        }
+      } catch {
+        // ignore; keep defaults
+      }
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -207,8 +241,44 @@ export default function MyPageProfileEdit() {
     if (!canSubmit) return;
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise((r) => setTimeout(r, 800));
+      const auth = getAuth(firebaseApp);
+      const user = auth.currentUser;
+      if (!user) {
+        router.replace('/login?redirect=/mypage/profile');
+        return;
+      }
+
+      // Update email if changed and editing was enabled
+      if (isEmailEditing && email && email !== (user.email || '')) {
+        try {
+          await updateEmail(user, email);
+        } catch (e: any) {
+          // Most common: auth/requires-recent-login
+          setIsSubmitting(false);
+          setMessage('error');
+          return;
+        }
+      }
+
+      // Persist profile fields in Firestore
+      const ref = doc(firestoreClient, 'users', user.uid);
+      await setDoc(
+        ref,
+        {
+          email,
+          fullName: name,
+          phone,
+          nickname,
+          agreements: {
+            terms: true,
+            privacy: true,
+            marketing: agreeMarketing,
+            channels: { email: marketingEmail, sms: marketingSMS },
+          },
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
       setMessage('success');
     } catch (e) {
       setMessage('error');
