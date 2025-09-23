@@ -4,8 +4,12 @@ import React, { useState } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { LoginTexts } from '@/app/types';
+import { useRouter } from 'next/navigation';
+import { firebaseApp } from '@/lib/firebase/client';
+import { EmailAuthProvider, getAuth, onAuthStateChanged, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 
 export default function ChangePasswordPage() {
+  const router = useRouter();
   const [currentLanguage, setCurrentLanguage] = useState<'ko' | 'en' | 'ja' | 'zh'>('ko');
   const [isBannerVisible, setIsBannerVisible] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -18,6 +22,20 @@ export default function ChangePasswordPage() {
   const [showCurrentPwd, setShowCurrentPwd] = useState(false);
   const [showNewPwd, setShowNewPwd] = useState(false);
   const [showNewPwdConfirm, setShowNewPwdConfirm] = useState(false);
+
+  // Guard and auth state
+  React.useEffect(() => {
+    const auth = getAuth(firebaseApp);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+        router.replace('/login?redirect=/mypage/change-password');
+      }
+    });
+    return () => unsub();
+  }, [router]);
 
   const getText = (key: keyof LoginTexts) => {
     const texts: Record<'ko' | 'en' | 'ja' | 'zh', LoginTexts> = {
@@ -162,18 +180,32 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    // Simulate API
     setIsSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      const auth = getAuth(firebaseApp);
+      const user = auth.currentUser;
+      if (!user || !user.email) {
+        setIsSubmitting(false);
+        router.replace('/login?redirect=/mypage/change-password');
+        return;
+      }
+
+      // Reauthenticate with current password
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Update to new password
+      await updatePassword(user, newPassword);
+
       setMessage('success');
       setCurrentPassword('');
       setNewPassword('');
       setNewPasswordConfirm('');
-    } catch (err) {
+    } catch (err: any) {
       setMessage('error');
-      console.error('Failed to change password', err);
-      throw new Error('Failed to change password');
+      // Do not throw; just log in console
+      // eslint-disable-next-line no-console
+      console.error('Failed to change password', err?.code || err?.message || err);
     } finally {
       setIsSubmitting(false);
     }
