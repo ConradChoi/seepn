@@ -270,7 +270,14 @@ export default function MyPageProfileEdit() {
 
       // Handle avatar upload/remove
       let newPhotoURL: string | null | undefined = undefined;
-      const storage = getStorage(firebaseApp);
+      // Normalize bucket to avoid misconfigured env like *.firebasestorage.app
+      const rawBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+      const normalizedBucket = rawBucket?.endsWith('firebasestorage.app')
+        ? rawBucket.replace('firebasestorage.app', 'appspot.com')
+        : rawBucket;
+      const storage = normalizedBucket
+        ? getStorage(firebaseApp, `gs://${normalizedBucket}`)
+        : getStorage(firebaseApp);
       if (avatarFile) {
         const fileName = `${Date.now()}_${avatarFile.name}`.replace(/\s+/g, '_');
         const storageRef = storageRefFn(storage, `avatars/${user.uid}/${fileName}`);
