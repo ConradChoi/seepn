@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Menu, User, Globe, X, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 interface HeaderProps {
   isBannerVisible: boolean;
@@ -71,22 +71,35 @@ export default function Header({
     }
   }, [isBannerPaused, isMenuOpen, banners.length]);
 
-  // Auth state sync
+  // Auth state sync + real-time user profile nickname
   React.useEffect(() => {
     const auth = getAuth(firebaseApp);
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeProfile: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      // Clean previous listener
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (user) {
         setIsLoggedIn(true);
         setUserEmail(user.email || '');
         setUserDisplayName(user.displayName || '');
         setUserPhotoURL(user.photoURL || null);
         try {
+          // Initial fetch
           const snap = await getDoc(doc(firestoreClient, 'users', user.uid));
-          const data = snap.exists() ? snap.data() as any : null;
+          const data = snap.exists() ? (snap.data() as any) : null;
           setUserNickname(data?.nickname || '');
         } catch {
           setUserNickname('');
         }
+        // Subscribe to changes for live nickname updates
+        unsubscribeProfile = onSnapshot(doc(firestoreClient, 'users', user.uid), (ds) => {
+          const d = ds.exists() ? (ds.data() as any) : null;
+          setUserNickname(d?.nickname || '');
+        });
       } else {
         setIsLoggedIn(false);
         setUserEmail('');
@@ -95,7 +108,11 @@ export default function Header({
         setUserPhotoURL(null);
       }
     });
-    return () => unsub();
+    return () => {
+      if (unsubscribeProfile) unsubscribeProfile();
+      unsubscribeProfile = null;
+      unsubscribeAuth();
+    };
   }, [setIsLoggedIn]);
 
   // Language-specific text content
