@@ -11,18 +11,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 } as const;
 
-// Basic runtime validation (helps catch CONFIGURATION_NOT_FOUND quickly in dev)
-if (
-  !firebaseConfig.apiKey ||
-  !firebaseConfig.authDomain ||
-  !firebaseConfig.projectId ||
-  !firebaseConfig.storageBucket ||
-  !firebaseConfig.messagingSenderId ||
-  !firebaseConfig.appId
-) {
-  // eslint-disable-next-line no-console
-  console.warn('[firebase] Missing required env vars. Check .env.local matches your Firebase Web config.');
-}
+// Optional runtime validation removed to avoid unused eslint-disable warnings in CI
 
 // Initialize client app only on the client bundles that actually import this.
 export const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();

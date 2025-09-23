@@ -7,7 +7,7 @@ import { Camera, X, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { firebaseApp, firestoreClient } from '@/lib/firebase/client';
 import { getAuth, onAuthStateChanged, updateEmail, updateProfile } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref as storageRefFn, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function MyPageProfileEdit() {
@@ -52,8 +52,8 @@ export default function MyPageProfileEdit() {
       try {
         setEmail(user.email || '');
         setName(user.displayName || '');
-        const ref = doc(firestoreClient, 'users', user.uid);
-        const snap = await getDoc(ref);
+        const userDocRef = doc(firestoreClient, 'users', user.uid);
+        const snap = await getDoc(userDocRef);
         const data = (snap.exists() ? (snap.data() as any) : {}) as any;
         if (data.nickname) setNickname(String(data.nickname));
         if (data.fullName) setName(String(data.fullName));
@@ -273,29 +273,31 @@ export default function MyPageProfileEdit() {
       const storage = getStorage(firebaseApp);
       if (avatarFile) {
         const fileName = `${Date.now()}_${avatarFile.name}`.replace(/\s+/g, '_');
-        const storageRef = ref(storage, `avatars/${user.uid}/${fileName}`);
+        const storageRef = storageRefFn(storage, `avatars/${user.uid}/${fileName}`);
         await uploadBytes(storageRef, avatarFile);
         newPhotoURL = await getDownloadURL(storageRef);
         try {
-          if (initialAvatarUrl && initialAvatarUrl !== newPhotoURL) {
-            await deleteObject(ref(storage, initialAvatarUrl));
+          if (initialAvatarUrl && initialAvatarUrl !== newPhotoURL && !initialAvatarUrl.startsWith('http')) {
+            const oldRef = storageRefFn(storage, initialAvatarUrl);
+            await deleteObject(oldRef);
           }
         } catch {}
         await updateProfile(user, { photoURL: newPhotoURL });
       } else if (avatarRemoved) {
         newPhotoURL = '';
         try {
-          if (initialAvatarUrl) {
-            await deleteObject(ref(storage, initialAvatarUrl));
+          if (initialAvatarUrl && !initialAvatarUrl.startsWith('http')) {
+            const oldRef = storageRefFn(storage, initialAvatarUrl);
+            await deleteObject(oldRef);
           }
         } catch {}
         await updateProfile(user, { photoURL: newPhotoURL });
       }
 
       // Persist profile fields in Firestore
-      const ref = doc(firestoreClient, 'users', user.uid);
+      const userDocRef = doc(firestoreClient, 'users', user.uid);
       await setDoc(
-        ref,
+        userDocRef,
         {
           email,
           fullName: name,

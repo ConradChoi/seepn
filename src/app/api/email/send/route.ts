@@ -47,8 +47,6 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
-    // eslint-disable-next-line no-console
-    console.error('Email send failed', err);
     return new Response(JSON.stringify({ error: 'Email send failed', message: err?.message || null }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

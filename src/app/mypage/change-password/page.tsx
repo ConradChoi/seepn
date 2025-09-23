@@ -203,9 +203,6 @@ export default function ChangePasswordPage() {
       setNewPasswordConfirm('');
     } catch (err: any) {
       setMessage('error');
-      // Do not throw; just log in console
-      // eslint-disable-next-line no-console
-      console.error('Failed to change password', err?.code || err?.message || err);
     } finally {
       setIsSubmitting(false);
     }
