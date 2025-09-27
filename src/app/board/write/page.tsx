@@ -7,6 +7,9 @@ import Footer from '@/components/Footer';
 import { ArrowLeft, Upload, X, Bold, Italic, Underline, List, ListOrdered, Link2, ChevronDown } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { firebaseApp } from '@/lib/firebase/client';
+import { getStorage, ref as storageRefFn, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { firestoreClient } from '@/lib/firebase/client';
 
 type PostCategory = 'daily' | 'curious' | 'together' | 'inform' | 'share' | 'tell';
 
@@ -259,18 +262,49 @@ export default function BoardWritePage() {
 
     setIsSubmitting(true);
     try {
-      // In real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('New post data:', {
+      const auth = getAuth(firebaseApp);
+      const user = auth.currentUser;
+      if (!user) {
+        router.replace('/login?redirect=/board/write');
+        return;
+      }
+
+      // Upload attachments to Firebase Storage
+      const rawBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+      const normalizedBucket = rawBucket?.endsWith('firebasestorage.app')
+        ? rawBucket.replace('firebasestorage.app', 'appspot.com')
+        : rawBucket;
+      const storage = normalizedBucket
+        ? getStorage(firebaseApp, `gs://${normalizedBucket}`)
+        : getStorage(firebaseApp);
+
+      const uploadedUrls: string[] = [];
+      for (const att of attachments) {
+        if (!att.file) continue;
+        const safeName = `${Date.now()}_${att.file.name}`.replace(/\s+/g, '_');
+        const fileRef = storageRefFn(storage, `board/${user.uid}/${safeName}`);
+        await uploadBytes(fileRef, att.file);
+        const url = await getDownloadURL(fileRef);
+        uploadedUrls.push(url);
+      }
+
+      // Create Firestore post document
+      const docRef = await addDoc(collection(firestoreClient, 'posts'), {
+        authorUid: user.uid,
+        authorEmail: user.email || null,
         category: selectedCategory,
-        title,
-        content,
-        attachments: attachments.map(a => a.name)
+        title: title.trim(),
+        contentHtml: content,
+        attachments: uploadedUrls,
+        likes: 0,
+        commentsCount: 0,
+        views: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-      
+
       alert('글이 등록되었습니다.');
-      router.push('/board');
+      router.push(`/board`);
     } catch (error) {
       console.error('Failed to register post:', error);
       alert('글 등록에 실패했습니다.');
