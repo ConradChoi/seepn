@@ -233,20 +233,12 @@ export default function BoardWritePage() {
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (isComposing) return;
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       try {
-        // Shift+Enter: single line break, Enter: new paragraph (two breaks)
         document.execCommand('insertLineBreak');
-        if (!e.shiftKey) {
-          document.execCommand('insertLineBreak');
-        }
       } catch {
-        try {
-          document.execCommand('insertHTML', false, e.shiftKey ? '<br>' : '<br><br>');
-        } catch {
-          // ignore
-        }
+        try { document.execCommand('insertHTML', false, '<br>'); } catch {}
       }
       if (editorRef.current) setContent(editorRef.current.innerHTML);
     }
@@ -481,6 +473,7 @@ export default function BoardWritePage() {
                 <div
                   ref={editorRef}
                   contentEditable
+                  dir="ltr"
                   onInput={handleEditorInput}
                   onKeyDown={handleEditorKeyDown}
                   onCompositionStart={() => setIsComposing(true)}
@@ -500,6 +493,8 @@ export default function BoardWritePage() {
                     direction: 'ltr',
                     unicodeBidi: 'plaintext',
                     textAlign: 'left',
+                    writingMode: 'horizontal-tb',
+                    textOrientation: 'mixed',
                   }}
                   suppressContentEditableWarning={true}
                 />
