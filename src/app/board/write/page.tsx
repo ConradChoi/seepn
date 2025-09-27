@@ -232,13 +232,23 @@ export default function BoardWritePage() {
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isComposing) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       try {
-        document.execCommand('insertParagraph');
+        // Shift+Enter: single line break, Enter: new paragraph (two breaks)
+        document.execCommand('insertLineBreak');
+        if (!e.shiftKey) {
+          document.execCommand('insertLineBreak');
+        }
       } catch {
-        // no-op fallback
+        try {
+          document.execCommand('insertHTML', false, e.shiftKey ? '<br>' : '<br><br>');
+        } catch {
+          // ignore
+        }
       }
+      if (editorRef.current) setContent(editorRef.current.innerHTML);
     }
   };
 
@@ -486,7 +496,10 @@ export default function BoardWritePage() {
                   style={{ 
                     maxHeight: '500px', 
                     overflowY: 'auto',
-                    lineHeight: '1.5'
+                    lineHeight: '1.5',
+                    direction: 'ltr',
+                    unicodeBidi: 'plaintext',
+                    textAlign: 'left',
                   }}
                   suppressContentEditableWarning={true}
                 />
