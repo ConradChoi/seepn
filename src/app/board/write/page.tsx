@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { ArrowLeft, Upload, X, Bold, Italic, Underline, List, ListOrdered, Link2, ChevronDown } from 'lucide-react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { firebaseApp } from '@/lib/firebase/client';
 
 type PostCategory = 'daily' | 'curious' | 'together' | 'inform' | 'share' | 'tell';
 
@@ -16,6 +18,7 @@ export default function BoardWritePage() {
   const [userCountry, setUserCountry] = useState('KR');
   const [isBannerVisible, setIsBannerVisible] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   
@@ -41,12 +44,20 @@ export default function BoardWritePage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Guard: redirect to login if not authenticated
+  // Sync auth state and guard after check
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.replace('/login');
+    const unsub = onAuthStateChanged(getAuth(firebaseApp), (user) => {
+      setIsLoggedIn(!!user);
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (authChecked && !isLoggedIn) {
+      router.replace('/login?redirect=/board/write');
     }
-  }, [isLoggedIn, router]);
+  }, [authChecked, isLoggedIn, router]);
 
   // Fetch user country
   useEffect(() => {
