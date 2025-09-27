@@ -233,14 +233,7 @@ export default function BoardWritePage() {
 
   // Let browser handle Enter/Shift+Enter naturally to reduce surprises
 
-  // Initialize editor content
-  useEffect(() => {
-    if (editorRef.current && content) {
-      editorRef.current.innerHTML = content;
-    }
-  }, [content]);
-
-  // Update editor when content changes externally
+  // Update editor when content changes externally (avoid caret reset on every input)
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== content) {
       editorRef.current.innerHTML = content;
@@ -479,10 +472,11 @@ export default function BoardWritePage() {
                     overflowY: 'auto',
                     lineHeight: '1.5',
                     direction: 'ltr',
-                    unicodeBidi: 'plaintext',
+                    unicodeBidi: 'normal',
                     textAlign: 'left',
                     writingMode: 'horizontal-tb',
                     textOrientation: 'mixed',
+                    whiteSpace: 'pre-wrap',
                   }}
                   suppressContentEditableWarning={true}
                 />
