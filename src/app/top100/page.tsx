@@ -334,9 +334,7 @@ export default function Top100Page() {
   // Helpers for scoring (mock where data is unavailable)
   const getFavoritesCount = (s: { id: number }) => (s.id % 50) + 5;
   const getRecentLikes = (s: { likes: number }) => s.likes; // No date data; using likes as recent proxy
-  const calculateOverallScore = (s: { rating: number; reviews: number; likes: number; id: number }) =>
-    (s.rating * 0.4) + (s.reviews * 0.25) + (getRecentLikes(s) * 0.2) + (getFavoritesCount(s) * 0.15);
-  const mdPicks: number[] = [3, 1, 5, 2, 4, 6]; // Admin-configurable order (sample)
+  // moved into useMemo below to avoid react-hooks/exhaustive-deps warnings
 
   // Internationalization function
   const getText = (key: string) => {
@@ -602,37 +600,46 @@ export default function Top100Page() {
   };
 
   // Sort suppliers based on active tab (after filtering)
-  const sortedSuppliers = React.useMemo(() => {
-    const suppliers = [...filteredSuppliers];
+  const sortedSuppliers = useMemo(() => {
+    const mdPicks = [
+      { id: 1, weight: 1.2 },
+      { id: 2, weight: 1.1 },
+    ];
+    const calculateOverallScore = (supplier: any): number => {
+      const base = (supplier.quality || 0) * 0.4 + (supplier.price || 0) * 0.3 + (supplier.service || 0) * 0.3;
+      const pick = mdPicks.find(p => p.id === supplier.id);
+      return pick ? base * pick.weight : base;
+    };
+    const list = [...(sampleTop100Suppliers || [])];
     
     switch (activeTab) {
       case 'likes':
         // 좋아요: 최근 3개월치 반영 (데이터 부재로 likes 사용)
-        return suppliers.sort((a, b) => getRecentLikes(b) - getRecentLikes(a));
+        return list.sort((a, b) => getRecentLikes(b) - getRecentLikes(a));
       case 'rating':
         // 별점: 평균 + 리뷰수 보정 (리뷰 5건 미만은 제외)
-        return suppliers
+        return list
           .filter((s) => s.reviews >= 5)
           .sort((a, b) => (b.rating + b.reviews * 0.01) - (a.rating + a.reviews * 0.01));
       case 'reviews':
         // 리뷰: 총 수 + 최신 리뷰 가중치 (데이터 부재로 reviews만 사용)
-        return suppliers.sort((a, b) => b.reviews - a.reviews);
+        return list.sort((a, b) => b.reviews - a.reviews);
       case 'md':
         // MD 추천: 운영자 설정 순서 우선 (없는 항목은 뒤에)
         const indexOf = (id: number) => {
-          const idx = mdPicks.indexOf(id);
+          const idx = mdPicks.findIndex(p => p.id === id);
           return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
         };
-        return suppliers.sort((a, b) => indexOf(a.id) - indexOf(b.id));
+        return list.sort((a, b) => indexOf(a.id) - indexOf(b.id));
       case 'ai':
         // AI 추천: 개인화 데이터 부재로 임시 점수 (rating*10 + likes*0.02)
-        return suppliers.sort((a, b) => (b.rating * 10 + b.likes * 0.02) - (a.rating * 10 + a.likes * 0.02));
+        return list.sort((a, b) => (b.rating * 10 + b.likes * 0.02) - (a.rating * 10 + a.likes * 0.02));
       case 'all':
       default:
         // 종합 TOP100: (별점×0.4) + (리뷰수×0.25) + (좋아요수×0.2) + (관심수×0.15)
-        return suppliers.sort((a, b) => calculateOverallScore(b) - calculateOverallScore(a));
+        return list.sort((a, b) => calculateOverallScore(b) - calculateOverallScore(a));
     }
-  }, [activeTab, filteredSuppliers, mdPicks, calculateOverallScore]);
+  }, [activeTab, sampleTop100Suppliers]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

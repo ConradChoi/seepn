@@ -9,7 +9,7 @@ import { firebaseApp } from '@/lib/firebase/client';
 const WARNING_MS = 50 * 60 * 1000;
 const LOGOUT_MS = 60 * 60 * 1000;
 
-export default function IdleGuard(): JSX.Element | null {
+export default function IdleGuard(): React.ReactElement | null {
   const router = useRouter();
   const [showWarning, setShowWarning] = useState(false);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
