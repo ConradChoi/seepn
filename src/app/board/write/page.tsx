@@ -231,18 +231,7 @@ export default function BoardWritePage() {
     setIsEditorFocused(false);
   };
 
-  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isComposing) return;
-    if (e.key === 'Enter' && e.shiftKey) {
-      e.preventDefault();
-      try {
-        document.execCommand('insertLineBreak');
-      } catch {
-        try { document.execCommand('insertHTML', false, '<br>'); } catch {}
-      }
-      if (editorRef.current) setContent(editorRef.current.innerHTML);
-    }
-  };
+  // Let browser handle Enter/Shift+Enter naturally to reduce surprises
 
   // Initialize editor content
   useEffect(() => {
@@ -475,7 +464,6 @@ export default function BoardWritePage() {
                   contentEditable
                   dir="ltr"
                   onInput={handleEditorInput}
-                  onKeyDown={handleEditorKeyDown}
                   onCompositionStart={() => setIsComposing(true)}
                   onCompositionEnd={() => {
                     setIsComposing(false);
