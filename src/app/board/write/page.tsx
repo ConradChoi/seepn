@@ -35,6 +35,7 @@ export default function BoardWritePage() {
   // Editor states
   const editorRef = useRef<HTMLDivElement>(null);
   const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
 
   // Mobile detection
   useEffect(() => {
@@ -216,6 +217,7 @@ export default function BoardWritePage() {
   };
 
   const handleEditorInput = () => {
+    if (isComposing) return;
     if (editorRef.current) {
       setContent(editorRef.current.innerHTML);
     }
@@ -227,6 +229,17 @@ export default function BoardWritePage() {
 
   const handleEditorBlur = () => {
     setIsEditorFocused(false);
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      try {
+        document.execCommand('insertParagraph');
+      } catch {
+        // no-op fallback
+      }
+    }
   };
 
   // Initialize editor content
@@ -459,6 +472,12 @@ export default function BoardWritePage() {
                   ref={editorRef}
                   contentEditable
                   onInput={handleEditorInput}
+                  onKeyDown={handleEditorKeyDown}
+                  onCompositionStart={() => setIsComposing(true)}
+                  onCompositionEnd={() => {
+                    setIsComposing(false);
+                    if (editorRef.current) setContent(editorRef.current.innerHTML);
+                  }}
                   onFocus={handleEditorFocus}
                   onBlur={handleEditorBlur}
                   className={`w-full min-h-[300px] px-3 py-2 border-x border-b border-gray-300 rounded-b-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
