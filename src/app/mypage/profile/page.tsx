@@ -77,7 +77,7 @@ export default function MyPageProfileEdit() {
   useEffect(() => {
     const fetchCountry = async () => {
       try {
-        const res = await fetch('https://ipapi.co/json/');
+        const res = await fetch('/api/geo');
         const data = await res.json();
         setUserCountry(data.country_name || '대한민국');
       } catch (e) {

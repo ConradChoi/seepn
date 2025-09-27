@@ -89,7 +89,7 @@ export default function Home() {
   React.useEffect(() => {
     const getUserCountry = async () => {
       try {
-        const response = await fetch('https://ipapi.co/json/');
+        const response = await fetch('/api/geo');
         const data = await response.json();
         const countryNames: { [key: string]: string } = {
           'KR': '대한민국',

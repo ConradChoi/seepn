@@ -24,13 +24,13 @@ export default function LoginPage() {
   React.useEffect(() => {
     const getUserCountry = async () => {
       try {
-        const response = await fetch('https://ipapi.co/json/');
+        const response = await fetch('/api/geo');
         const data = await response.json();
         setUserCountry(data.country_name || '대한민국');
       } catch (error) {
         setUserCountry('대한민국');
         console.error('Failed to fetch user country', error);
-        throw new Error('Failed to fetch user country');
+        // swallow to avoid unhandled rejection
       }
     };
     getUserCountry();

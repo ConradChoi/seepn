@@ -52,7 +52,7 @@ export default function BoardWritePage() {
   useEffect(() => {
     const fetchUserCountry = async () => {
       try {
-        const response = await fetch('https://ipapi.co/json/');
+        const response = await fetch('/api/geo');
         const data = await response.json();
         setUserCountry(data.country_name || 'Unknown');
       } catch (error) {
