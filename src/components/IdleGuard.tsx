@@ -87,10 +87,8 @@ export default function IdleGuard(): React.ReactElement | null {
     ];
 
     events.forEach((evt) => {
-      // @ts-expect-error union of window/document listeners
       (window.addEventListener as any)(evt, onAnyActivity, { passive: true });
       // 일부 이벤트는 document에도 바인딩
-      // @ts-expect-error document events
       (document.addEventListener as any)(evt, onAnyActivity, { passive: true });
     });
 
@@ -113,9 +111,7 @@ export default function IdleGuard(): React.ReactElement | null {
     return () => {
       clearTimers();
       events.forEach((evt) => {
-        // @ts-expect-error union of window/document listeners
         (window.removeEventListener as any)(evt, onAnyActivity);
-        // @ts-expect-error document events
         (document.removeEventListener as any)(evt, onAnyActivity);
       });
       channel?.removeEventListener('message', onMessage);
