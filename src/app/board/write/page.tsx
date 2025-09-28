@@ -37,6 +37,25 @@ export default function BoardWritePage() {
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
 
+  // File constraints
+  const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
+  const ALLOWED_EXTS = ['pdf', 'hwp', 'hwpx', 'jpg', 'jpeg', 'gif', 'png'];
+  const ALLOWED_MIME_REGEXES = [
+    /^image\/(jpeg|jpg|png|gif)$/i,
+    /^application\/pdf$/i,
+    // Some browsers don't set specific HWP/HWXP mime types reliably -> validate by extension as fallback
+  ];
+
+  const getFileExt = (name: string) => (name.includes('.') ? name.split('.').pop()?.toLowerCase() || '' : '');
+  const isAllowedFile = (file: File): { ok: boolean; reason?: string } => {
+    if (file.size > MAX_FILE_BYTES) return { ok: false, reason: '파일 크기는 최대 20MB 까지 가능합니다.' };
+    const ext = getFileExt(file.name);
+    const mimeOk = ALLOWED_MIME_REGEXES.some((r) => r.test(file.type));
+    const extOk = ALLOWED_EXTS.includes(ext);
+    if (!(mimeOk || extOk)) return { ok: false, reason: '허용되지 않은 파일 형식입니다. (pdf, hwp, hwpx, jpg, jpeg, gif, png)' };
+    return { ok: true };
+  };
+
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -172,6 +191,11 @@ export default function BoardWritePage() {
     const files = Array.from(e.target.files || []);
     
     files.forEach(file => {
+      const allowed = isAllowedFile(file);
+      if (!allowed.ok) {
+        alert(`${file.name}: ${allowed.reason}`);
+        return;
+      }
       const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
       const newAttachment = {
         name: file.name,
@@ -193,6 +217,11 @@ export default function BoardWritePage() {
     
     if (files.length > 0) {
       files.forEach(file => {
+        const allowed = isAllowedFile(file);
+        if (!allowed.ok) {
+          alert(`${file.name}: ${allowed.reason}`);
+          return;
+        }
         const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
         const newAttachment = {
           name: file.name,
@@ -265,6 +294,8 @@ export default function BoardWritePage() {
         router.replace('/login?redirect=/board/write');
         return;
       }
+      // Refresh auth token to avoid 401 on Storage preflight
+      try { await user.getIdToken(true); } catch {}
 
       // Upload attachments to Firebase Storage
       const rawBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
