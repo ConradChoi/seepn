@@ -566,12 +566,16 @@ export default function BoardWritePage() {
                     type="file"
                     id="file-upload"
                     multiple
+                    accept=".pdf,.hwp,.hwpx,.jpg,.jpeg,.gif,.png"
                     className="hidden"
                     onChange={handleFileUpload}
                   />
                   <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm">{getText('fileUploadText')}</p>
                 </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  최대 20MB, 허용 확장자: pdf, hwp, hwpx, jpg, jpeg, gif, png
+                </p>
               </div>
             </div>
           </div>
