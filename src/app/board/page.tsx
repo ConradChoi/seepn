@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Search, Paperclip, Heart, MessageCircle, Eye, Edit, ChevronDown, X } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { firestoreClient } from '@/lib/firebase/client';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { firebaseApp } from '@/lib/firebase/client';
 
 export default function BoardPage() {
   const router = useRouter();
@@ -19,6 +22,14 @@ export default function BoardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchTypeModalOpen, setIsSearchTypeModalOpen] = useState(false);
   const [isListCategoryModalOpen, setIsListCategoryModalOpen] = useState(false);
+  
+  // Firebase posts state
+  const [posts, setPosts] = useState<any[]>([]);
+  const [formattedPosts, setFormattedPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userNicknames, setUserNicknames] = useState<{[key: string]: string}>({});
 
   // Mobile detection
   useEffect(() => {
@@ -30,6 +41,60 @@ export default function BoardPage() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Firebase authentication check
+  useEffect(() => {
+    const auth = getAuth(firebaseApp);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user);
+      setAuthChecked(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch posts from Firebase
+  useEffect(() => {
+    if (!authChecked) return;
+
+    const fetchPosts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const postsRef = collection(firestoreClient, 'posts');
+        let q = query(postsRef, orderBy('createdAt', 'desc'));
+
+        // Apply category filter if selected
+        if (selectedCategory) {
+          q = query(postsRef, where('category', '==', selectedCategory), orderBy('createdAt', 'desc'));
+        }
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const postsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
+          }));
+          
+          setPosts(postsData);
+          setLoading(false);
+        }, (error) => {
+          console.error('Error fetching posts:', error);
+          setError('게시글을 불러오는 중 오류가 발생했습니다.');
+          setLoading(false);
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error setting up posts listener:', error);
+        setError('게시글을 불러오는 중 오류가 발생했습니다.');
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, [authChecked, selectedCategory]);
 
   // Fetch user country
   useEffect(() => {
@@ -55,6 +120,81 @@ export default function BoardPage() {
 
     fetchUserCountry();
   }, []);
+
+  // Fetch user nicknames in batch
+  const fetchUserNicknames = useCallback(async (uids: string[]) => {
+    const newNicknames: {[key: string]: string} = {};
+    const uidsToFetch = uids.filter(uid => !userNicknames[uid]);
+
+    if (uidsToFetch.length > 0) {
+      try {
+        const userPromises = uidsToFetch.map(async (uid) => {
+          try {
+            const userDoc = await getDoc(doc(firestoreClient, 'users', uid));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              return {
+                uid,
+                nickname: userData.nickname || userData.displayName || '익명'
+              };
+            }
+            return { uid, nickname: '익명' };
+          } catch (error) {
+            console.error(`Error fetching user ${uid}:`, error);
+            return { uid, nickname: '익명' };
+          }
+        });
+
+        const results = await Promise.all(userPromises);
+        results.forEach(({ uid, nickname }) => {
+          newNicknames[uid] = nickname;
+        });
+      } catch (error) {
+        console.error('Error fetching user nicknames:', error);
+      }
+    }
+
+    // Update nicknames state
+    if (Object.keys(newNicknames).length > 0) {
+      setUserNicknames(prev => ({
+        ...prev,
+        ...newNicknames
+      }));
+    }
+  }, [userNicknames]);
+
+  // Format Firebase posts data
+  const formatPosts = useCallback((posts: any[]) => {
+    return posts.map(post => ({
+      id: post.id,
+      category: post.category || 'daily',
+      title: post.title || '',
+      content: post.contentHtml || post.content || '',
+      author: userNicknames[post.authorUid] || '익명',
+      registrationDate: post.createdAt?.toISOString() || new Date().toISOString(),
+      likes: post.likes || 0,
+      comments: post.commentsCount || 0,
+      views: post.views || 0,
+      hasAttachment: post.attachments && post.attachments.length > 0
+    }));
+  }, [userNicknames]);
+
+  // Format posts when posts or userNicknames change
+  useEffect(() => {
+    if (posts.length > 0) {
+      // Get unique user IDs from posts
+      const uniqueUids = [...new Set(posts.map(post => post.authorUid))];
+      
+      // Fetch nicknames for new users
+      fetchUserNicknames(uniqueUids);
+      
+      // Format posts with current nicknames
+      const formatted = formatPosts(posts);
+      setFormattedPosts(formatted);
+    } else {
+      setFormattedPosts([]);
+    }
+  }, [posts, userNicknames, fetchUserNicknames, formatPosts]);
 
   // Text translations
   const getText = (key: string) => {
@@ -280,89 +420,8 @@ export default function BoardPage() {
   //   return nickname;
   // };
 
-  // Sample board posts with Korean + English nicknames
-  const samplePosts = [
-    {
-      id: 1,
-      category: 'curious',
-      title: getText('post1Title'),
-      content: getText('post1Content'),
-      author: '기술탐험가7',
-      registrationDate: '2025-01-12T14:30:00',
-      likes: 12,
-      comments: 5,
-      views: 156,
-      hasAttachment: false
-    },
-    {
-      id: 2,
-      category: 'curious',
-      title: getText('post2Title'),
-      content: getText('post2Content'),
-      author: 'NewbieMom2',
-      registrationDate: '2025-01-12T11:20:00',
-      likes: 8,
-      comments: 3,
-      views: 89,
-      hasAttachment: false
-    },
-    {
-      id: 3,
-      category: 'together',
-      title: getText('post3Title'),
-      content: getText('post3Content'),
-      author: '전시회러버',
-      registrationDate: '2025-01-11T16:45:00',
-      likes: 15,
-      comments: 7,
-      views: 203,
-      hasAttachment: true
-    },
-    {
-      id: 4,
-      category: 'inform',
-      title: getText('post4Title'),
-      content: getText('post4Content'),
-      author: 'Admin2025',
-      registrationDate: '2025-01-11T09:15:00',
-      likes: 25,
-      comments: 12,
-      views: 445,
-      hasAttachment: true
-    },
-    {
-      id: 5,
-      category: 'share',
-      title: getText('post5Title'),
-      content: getText('post5Content'),
-      author: '나눔왕1',
-      registrationDate: '2025-01-10T13:30:00',
-      likes: 18,
-      comments: 9,
-      views: 267,
-      hasAttachment: false
-    },
-    {
-      id: 6,
-      category: 'tell',
-      title: getText('post6Title'),
-      content: getText('post6Content'),
-      author: 'StoryTell9',
-      registrationDate: '2025-01-10T10:20:00',
-      likes: 22,
-      comments: 14,
-      views: 321,
-      hasAttachment: false
-    }
-  ];
-
   // Filter posts based on search
-  const filteredPosts = samplePosts.filter(post => {
-    // Filter by category
-    if (selectedCategory && post.category !== selectedCategory) {
-      return false;
-    }
-
+  const filteredPosts = formattedPosts.filter(post => {
     // Filter by search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -382,6 +441,17 @@ export default function BoardPage() {
   const handleSearch = () => {
     // Search is handled by filteredPosts automatically
     console.log('Search:', selectedCategory, searchType, searchQuery);
+  };
+
+  // Handle post click based on login status
+  const handlePostClick = (postId: string) => {
+    if (isLoggedIn) {
+      // Logged in: go to detail page
+      router.push(`/board/${postId}`);
+    } else {
+      // Not logged in: go to login page
+      router.push('/login');
+    }
   };
 
   // Handle write button
@@ -504,13 +574,38 @@ export default function BoardPage() {
             </button>
           </div>
 
+          {/* Loading State */}
+          {loading && (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">게시글을 불러오는 중...</span>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center">
+                <div className="text-red-600">
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">오류 발생</h3>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Posts List */}
           <div className="space-y-4">
-            {filteredPosts.length > 0 ? (
+            {!loading && !error && filteredPosts.length > 0 ? (
               filteredPosts.map((post) => (
                 <div key={post.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md hover:border-gray-300 cursor-pointer transition-all">
                   {/* PC Layout */}
-                  <Link href={`/board/${post.id}`} className="hidden sm:block">
+                  <div onClick={() => handlePostClick(post.id)} className="hidden sm:block">
                     {/* Header: Category */}
                     <div className="flex items-center gap-3 mb-2">
                       <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${getCategoryInfo(post.category).color}`}>
@@ -557,10 +652,10 @@ export default function BoardPage() {
                         </div>
                       </div>
                     </div>
-                  </Link>
+                  </div>
 
                   {/* Mobile Layout */}
-                  <Link href={`/board/${post.id}`} className="block sm:hidden">
+                  <div onClick={() => handlePostClick(post.id)} className="block sm:hidden">
                     {/* 1. 구분 */}
                     <div className="mb-3">
                       <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${getCategoryInfo(post.category).color}`}>
@@ -605,12 +700,18 @@ export default function BoardPage() {
                         <span>{post.views}</span>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 </div>
               ))
-            ) : (
+            ) : !loading && !error && (
               <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-500">검색 결과가 없습니다.</p>
+                <div className="text-gray-400 mb-4">
+                  <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 text-lg mb-2">게시글이 없습니다</p>
+                <p className="text-gray-400 text-sm">첫 번째 게시글을 작성해보세요!</p>
               </div>
             )}
           </div>

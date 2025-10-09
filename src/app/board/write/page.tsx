@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 import { ArrowLeft, Upload, X, Bold, Italic, Underline, List, ListOrdered, Link2, ChevronDown } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { firebaseApp } from '@/lib/firebase/client';
-import { getStorage, ref as storageRefFn, uploadBytes, getDownloadURL } from 'firebase/storage';
+// import { getStorage, ref as storageRefFn, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { firestoreClient } from '@/lib/firebase/client';
 
@@ -297,23 +297,38 @@ export default function BoardWritePage() {
       // Refresh auth token to avoid 401 on Storage preflight
       try { await user.getIdToken(true); } catch {}
 
-      // Upload attachments to Firebase Storage
-      const rawBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-      const normalizedBucket = rawBucket?.endsWith('firebasestorage.app')
-        ? rawBucket.replace('firebasestorage.app', 'appspot.com')
-        : rawBucket;
-      const storage = normalizedBucket
-        ? getStorage(firebaseApp, `gs://${normalizedBucket}`)
-        : getStorage(firebaseApp);
-
+      // Upload attachments to local storage (avoiding Firebase Storage CORS issues)
       const uploadedUrls: string[] = [];
       for (const att of attachments) {
         if (!att.file) continue;
-        const safeName = `${Date.now()}_${att.file.name}`.replace(/\s+/g, '_');
-        const fileRef = storageRefFn(storage, `board/${user.uid}/${safeName}`);
-        await uploadBytes(fileRef, att.file);
-        const url = await getDownloadURL(fileRef);
-        uploadedUrls.push(url);
+        
+        try {
+          const safeName = `${Date.now()}_${att.file.name}`.replace(/\s+/g, '_');
+          const filePath = `board/${user.uid}/${safeName}`;
+          
+          const formData = new FormData();
+          formData.append('file', att.file);
+          formData.append('path', filePath);
+          
+          const response = await fetch('/api/upload-local', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          if (result.success && result.downloadURL) {
+            uploadedUrls.push(result.downloadURL);
+          } else {
+            console.error('Upload failed:', result.error);
+          }
+        } catch (error) {
+          console.error('Failed to upload file:', error);
+          // Continue with other files even if one fails
+        }
       }
 
       // Create Firestore post document

@@ -1,5 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,5 +17,6 @@ const firebaseConfig = {
 // Initialize client app only on the client bundles that actually import this.
 export const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const firestoreClient = getFirestore(firebaseApp);
+export const storageClient = getStorage(firebaseApp);
 
 

@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { ArrowLeft, Paperclip, Heart, MessageCircle, Eye, Edit, Trash2, Send } from 'lucide-react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { firebaseApp } from '@/lib/firebase/client';
 
 export default function BoardDetailPage() {
   const params = useParams();
@@ -15,6 +17,7 @@ export default function BoardDetailPage() {
   const [userCountry, setUserCountry] = useState('대한민국');
   const [isBannerVisible, setIsBannerVisible] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [currentUserId] = useState(1); // 현재 로그인한 사용자 ID (예시)
   const [isLiked, setIsLiked] = useState(false);
@@ -24,6 +27,26 @@ export default function BoardDetailPage() {
   const [editingCommentText, setEditingCommentText] = useState('');
   const [replyingToCommentId, setReplyingToCommentId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
+
+  // Firebase authentication check
+  useEffect(() => {
+    const auth = getAuth(firebaseApp);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const wasLoggedIn = isLoggedIn;
+      const isNowLoggedIn = !!user;
+      
+      setIsLoggedIn(isNowLoggedIn);
+      setAuthChecked(true);
+      
+      // 로그아웃 감지: 이전에 로그인되어 있었는데 지금 로그아웃된 경우
+      if (wasLoggedIn && !isNowLoggedIn && authChecked) {
+        console.log('User logged out, redirecting to login page');
+        router.push('/login');
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [isLoggedIn, authChecked, router]);
 
   // Mobile detection
   useEffect(() => {
